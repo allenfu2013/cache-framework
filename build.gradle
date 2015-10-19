@@ -1,0 +1,25 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'maven'
+
+repositories{
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/java'
+        }
+        resources {
+            srcDir 'src/resources'
+        }
+    }
+}
+
+dependencies{
+    def spring = ['org.springframework:spring-beans:4.1.6.RELEASE',
+                    'org.springframework:spring-core:4.1.6.RELEASE'
+                ]
+    compile spring
+}
