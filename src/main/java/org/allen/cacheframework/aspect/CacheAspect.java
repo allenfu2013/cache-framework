@@ -1,11 +1,14 @@
 package org.allen.cacheframework.aspect;
 
+import com.google.common.reflect.TypeParameter;
+import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import org.allen.cacheframework.CacheEnableException;
 import org.allen.cacheframework.CacheService;
 import org.allen.cacheframework.OperationType;
 import org.allen.cacheframework.annotation.CacheEnable;
 import org.allen.cacheframework.annotation.KeyParam;
+import org.allen.cacheframework.util.Logger;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -63,7 +66,7 @@ public class CacheAspect {
         boolean putEmptyObjectWhenNull = cacheEnable.putEmptyObjectWhenNull();
         int emptyObjExpireSecondsTmp = cacheEnable.emptyObjExpireSeconds();
         boolean removeBeforeUpdate = cacheEnable.removeBeforeUpdate();
-//        Logger.info(this, String.format("cachedAround with class: %s, method: %s", joinPoint.getTarget().getClass().getName(), method.getName()));
+        Logger.info(this, String.format("cachedAround with class: %s, method: %s", joinPoint.getTarget().getClass().getName(), method.getName()));
 
         try {
             //使用Spring Expression Language处理动态key
@@ -111,9 +114,10 @@ public class CacheAspect {
                 keys.add(key);
             }
 
-            //TODO multiKey
             if (OperationType.GET == opsType) {
-                return doGet(joinPoint, method, returnType, key, expireSecondsTmp, putEmptyObjectWhenNull, emptyObjExpireSecondsTmp);
+                return multiKeyCount > 0 ?
+                        doMultiGet(joinPoint, method, returnType, keys, multiKeyIndex, expireSecondsTmp, putEmptyObjectWhenNull, emptyObjExpireSecondsTmp)
+                        : doGet(joinPoint, method, returnType, key, expireSecondsTmp, putEmptyObjectWhenNull, emptyObjExpireSecondsTmp);
             } else if (OperationType.PUT == opsType) {
                 return doPut(joinPoint, key, expireSecondsTmp, removeBeforeUpdate, putEmptyObjectWhenNull, emptyObjExpireSecondsTmp);
             } else if (OperationType.REMOVE == opsType) {
@@ -121,7 +125,7 @@ public class CacheAspect {
             }
         } catch (Throwable throwable) {
             // any exception in AOP process, call original method instead
-//            Logger.error(this, String.format("cache aop process fail, error: %s", throwable.getMessage()), throwable);
+            Logger.error(this, String.format("cache aop process fail, error: %s", throwable.getMessage()), throwable);
             return joinPoint.proceed();
         }
         return null;
@@ -131,13 +135,12 @@ public class CacheAspect {
         String className = joinPoint.getTarget().getClass().getName();
         String methodName = method.getName();
 
-
         if (returnType == void.class)
             throw new CacheEnableException(String.format("returnType can not be void for OperationType.GET, class: %s, method: %s", className, methodName));
 
         String cacheString = cacheService.get(key);
         if (cacheString != null) {
-//            Logger.info(this, String.format("cache hits for class: %s, method: %s, key: %s, value: %s", className, methodName, key, cacheString));
+            Logger.info(this, String.format("cache hits for class: %s, method: %s, key: %s, value: %s", className, methodName, key, cacheString));
             boolean isReturnAList = method.getReturnType().isAssignableFrom(List.class);
             if (!isReturnAList) {
                 return new Gson().fromJson(cacheString, returnType);
@@ -145,7 +148,7 @@ public class CacheAspect {
                 return new Gson().fromJson(cacheString, listType(returnType));
             }
         } else {
-//            Logger.info(this, String.format("cache misses for class: %s, method: %s, key: %s", className, methodName, key));
+            Logger.info(this, String.format("cache misses for class: %s, method: %s, key: %s", className, methodName, key));
             Object obj = null;
             if (putEmptyObjectWhenNull) {
                 String emptyKey = key + EMPTY_KEY;
@@ -167,7 +170,6 @@ public class CacheAspect {
             return obj;
         }
     }
-
 
     private Object doMultiGet(ProceedingJoinPoint joinPoint, Method method, Class returnType, List<String> keys, int multiKeyIndex, int expireSecondsTmp, boolean putEmptyObjectWhenNull,int emptyObjExpireSecondsTmp) throws Throwable {
         List<String> caches = cacheService.mget(keys);
@@ -210,7 +212,7 @@ public class CacheAspect {
     private Object doRemove(ProceedingJoinPoint joinPoint, List<String> keys) throws Throwable {
         String className = joinPoint.getTarget().getClass().getName();
         String methodName = ((MethodSignature) joinPoint.getSignature()).getMethod().getName();
-//        Logger.info(this, String.format("remove from cache, class: %s, method: %s, keys: %s", className, methodName, keys));
+        Logger.info(this, String.format("remove from cache, class: %s, method: %s, keys: %s", className, methodName, keys));
         for (String key : keys) {
             cacheService.remove(key);
         }
@@ -220,7 +222,7 @@ public class CacheAspect {
     private Object doPut(ProceedingJoinPoint joinPoint, String key, int expireSecondsTmp, boolean removeBeforeUpdate, boolean putEmptyObjectWhenNull,int emptyObjExpireSecondsTmp) throws Throwable {
         String className = joinPoint.getTarget().getClass().getName();
         String methodName = ((MethodSignature) joinPoint.getSignature()).getMethod().getName();
-//        Logger.info(this, String.format("update cache, class: %s, method: %s, key: %s, expireSeconds: %s", className, methodName, key, expireSeconds));
+        Logger.info(this, String.format("update cache, class: %s, method: %s, key: %s, expireSeconds: %s", className, methodName, key, expireSeconds));
         if (removeBeforeUpdate) {
             cacheService.remove(key);
         }
