@@ -19,8 +19,10 @@ public UserInfo getUserInfoById(@KeyParam(connector=":") long id){
   // 业务逻辑
 }
 
+```
+
 以上配置会生成缓存的key为"user:"加上查询时实际的id。比如用户id=1，则缓存key就是"user:1"。
 因此，缓存模块会在方法执行前先根据key="user:1"去缓存中查询，如果命中则直接将这个值返回给调用方。
 如果未命中，则执行方法中的业务方法，之后将得到的值方法缓存中。
 
-```
+## 未完待续
